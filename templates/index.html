@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nipah Tracker — 니파 바이러스 실시간 현황</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────── -->
+<header>
+  <a class="logo-mark" href="#">
+    <span class="live-dot"></span>
+    NIPAH&thinsp;TRACKER
+  </a>
+  <span class="live-badge">LIVE</span>
+  <div class="header-spacer"></div>
+  <span class="updated-ts" id="ts">{{ last_updated_str }}</span>
+  <button class="btn-refresh" id="refreshBtn" onclick="doRefresh()">
+    <span id="refreshIcon">↻</span> 갱신
+  </button>
+</header>
+
+<!-- ── MAIN ────────────────────────────────────────────── -->
+<main>
+
+  <!-- 활성 경보 배너 -->
+  {% if active_count > 0 %}
+  <div class="alert-strip">
+    <span style="color:var(--red); font-size:1rem;">⚠</span>
+    <span>
+      <strong>현재 {{ active_count }}개국 활성 발생 중.</strong>
+      니파 바이러스는 WHO 우선 병원체(R&D Blueprint)로 지정되어 있으며
+      승인된 백신·치료제가 없습니다.
+    </span>
+  </div>
+  {% endif %}
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi red">
+      <div class="kpi-label">누적 사망자</div>
+      <div class="kpi-num red">{{ "{:,}".format(total_deaths) }}</div>
+      <div class="kpi-sub">전체 기록 기준</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-label">누적 확진자</div>
+      <div class="kpi-num orange">{{ "{:,}".format(total_confirmed) }}</div>
+      <div class="kpi-sub">1998년 이후</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">평균 치명률 (CFR)</div>
+      <div class="kpi-num" style="color:var(--orange)">{{ avg_cfr }}%</div>
+      <div class="kpi-sub">WHO 추정 40~75%</div>
+    </div>
+    <div class="kpi {% if active_count > 0 %}red{% else %}green{% endif %}">
+      <div class="kpi-label">현재 활성 발생국</div>
+      <div class="kpi-num {% if active_count > 0 %}red{% else %}green{% endif %}">{{ active_count }}</div>
+      <div class="kpi-sub">총 {{ stats|length }}개국 발생 이력</div>
+    </div>
+  </div>
+
+  <!-- ── 섹션: 실시간 현황 ── -->
+  <div class="sec">실시간 현황</div>
+  <div class="grid-3" style="margin-bottom:0.75rem;">
+
+    <!-- 지도 -->
+    <div class="card">
+      <div class="card-head">
+        <span>🌏 발생 지도</span>
+        <span>● 활성 &nbsp;● 종식</span>
+      </div>
+      <div id="map"></div>
+    </div>
+
+    <!-- 뉴스 -->
+    <div class="card">
+      <div class="card-head">
+        <span>📡 최신 뉴스</span>
+        <span>{{ news_list|length }}건</span>
+      </div>
+      <div class="news-list">
+        {% if news_list %}
+          {% for n in news_list %}
+          <div class="news-item {% if n.is_alert %}alert{% endif %}">
+            <span class="news-cat cat-{{ n.category }}">
+              {% if n.category=='outbreak' %}발생{% elif n.category=='research' %}연구{% elif n.category=='prevention' %}예방{% else %}일반{% endif %}
+            </span>
+            <a class="news-title" href="{{ n.link }}" target="_blank" rel="noopener">{{ n.title }}</a>
+            <div class="news-meta" data-date="{{ n.pub_date[:10] if n.pub_date else '' }}">{{ n.source }} · {{ n.pub_date[:10] if n.pub_date else '—' }}</div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div style="padding:2rem; text-align:center; color:var(--muted); font-size:0.78rem;">뉴스 없음</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 섹션: 최근 동향 ── -->
+  <div class="sec">최근 동향 ({{ current_year - 3 }}~{{ current_year }})</div>
+  <div class="grid-2" style="margin-bottom:0.75rem;">
+
+    <!-- 최근 5년 발생 차트 -->
+    <div class="card">
+      <div class="card-head">
+        <span>📈 연도별 발생 (최근 5년)</span>
+        <button class="toggle-history" id="histBtn" onclick="toggleHistory()">전체 이력 보기</button>
+      </div>
+      <div class="chart-wrap"><canvas id="timelineChart"></canvas></div>
+    </div>
+
+    <!-- 최근 이벤트 피드 -->
+    <div class="card">
+      <div class="card-head"><span>🕐 최근 발생 이벤트</span></div>
+      <div class="event-feed">
+        {% for ev in recent_events %}
+        <div class="event-item">
+          <span class="event-dot
+            {% if ev.country == 'India' or ev.country == 'Bangladesh' %}dot-active
+            {% else %}dot-contained{% endif %}">
+          </span>
+          <div style="flex:1;">
+            <div class="event-country">{{ ev.country }}</div>
+            <div class="event-nums">
+              확진 <span>{{ ev.confirmed }}명</span> &nbsp;·&nbsp;
+              사망 <span class="red">{{ ev.deaths }}명</span>
+              <span style="margin-left:6px; font-size:0.6rem; color:var(--muted)">{{ ev.source_note[:30] if ev.source_note else '' }}</span>
+            </div>
+          </div>
+          <span class="event-year">{{ ev.year }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 섹션: 국가별 상세 ── -->
+  <div class="sec">국가별 현황</div>
+  <div class="grid-2" style="margin-bottom:0.75rem;">
+
+    <!-- CFR 차트 -->
+    <div class="card">
+      <div class="card-head"><span>☠ 국가별 치명률 (CFR)</span></div>
+      <div class="chart-wrap sm"><canvas id="cfrChart"></canvas></div>
+    </div>
+
+    <!-- 상태 테이블 -->
+    <div class="card">
+      <div class="card-head"><span>국가별 통계</span></div>
+      <div style="overflow-x:auto;">
+        <table class="status-table">
+          <thead>
+            <tr>
+              <th>국가</th>
+              <th>확진</th>
+              <th>사망</th>
+              <th>CFR</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in stats|sort(attribute='confirmed', reverse=True) %}
+            <tr>
+              <td>
+                {{ d.country }}
+                <div style="font-size:0.65rem; color:var(--muted2); margin-top:1px;">{{ d.region or '' }}</div>
+              </td>
+              <td style="font-family:var(--mono)">{{ "{:,}".format(d.confirmed) }}</td>
+              <td style="font-family:var(--mono); color:var(--red)">{{ "{:,}".format(d.deaths) }}</td>
+              <td>
+                <div class="cfr-bar-row">
+                  <div class="cfr-bar" style="width:{{ [d.fatality_rate, 100]|min | int }}px"></div>
+                  <span style="font-family:var(--mono); font-size:0.72rem; color:var(--orange)">{{ d.fatality_rate }}%</span>
+                </div>
+              </td>
+              <td>
+                {% if d.status == 'active' %}
+                  <span class="pill pill-active">활성</span>
+                {% elif d.status == 'contained' %}
+                  <span class="pill pill-contained">종식</span>
+                {% else %}
+                  <span class="pill pill-historical">이력</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 전체 이력 (기본 숨김) -->
+  <div id="historySection" style="display:none; margin-bottom:0.75rem;">
+    <div class="sec">전체 발생 이력 (1998~현재)</div>
+    <div class="card">
+      <div class="card-head"><span>📊 연도별 전체 이력</span></div>
+      <div class="chart-wrap"><canvas id="allTimelineChart"></canvas></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  NIPAH TRACKER · 출처: WHO Disease Outbreak News, IEDCR Bangladesh, CDC<br>
+  본 대시보드는 참고용이며 의학적 조언이 아닙니다 · 갱신 버튼으로 최신 뉴스를 불러올 수 있습니다
+</footer>
+
+<!-- ── SCRIPTS ──────────────────────────────────────────── -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+
+/* ── 자동 시각 갱신 ── */
+function fmtNow() {
+  const d = new Date();
+  return d.toLocaleString('ko-KR', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) + ' KST';
+}
+document.getElementById('ts').textContent = fmtNow();
+
+/* ── 지도 ── */
+const mapEl = L.map('map', {
+  zoomControl: false, attributionControl: false,
+  preferCanvas: true
+}).setView([15, 100], 3);
+L.control.zoom({ position: 'bottomright' }).addTo(mapEl);
+
+// 타일 레이어 (CARTO 실패 시 OSM 폴백)
+const cartoTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 19, crossOrigin: true
+});
+const osmTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  subdomains: 'abc', maxZoom: 19, opacity: 0.4
+});
+cartoTile.on('tileerror', () => { osmTile.addTo(mapEl); });
+cartoTile.addTo(mapEl);
+
+// 컨테이너 크기 강제 재계산 (CSS 레이아웃 완료 후)
+setTimeout(() => mapEl.invalidateSize(), 200);
+
+const locations = [{% for d in stats %}{
+  country: {{ d.country|tojson }},
+  confirmed: {{ d.confirmed }}, deaths: {{ d.deaths }},
+  cfr: {{ d.fatality_rate }}, lat: {{ d.lat }}, lon: {{ d.lon }},
+  status: {{ d.status|tojson }}, region: {{ (d.region or '')|tojson }},
+  year: {{ (d.outbreak_year or '')|tojson }},
+},{% endfor %}];
+
+locations.forEach(loc => {
+  if (!loc.lat || !loc.lon || !loc.confirmed) return;
+  const r = Math.min(Math.sqrt(loc.confirmed) * 2.2, 55) + 5;
+  const color = loc.status === 'active' ? '#e63946' : '#34d399';
+  L.circleMarker([loc.lat, loc.lon], {
+    color, fillColor: color, fillOpacity: 0.3, weight: 1.5, radius: r
+  }).bindPopup(`
+    <div class="pop-country">${loc.country}</div>
+    ${loc.region ? `<div style="font-size:0.65rem;color:#4a5568;margin-bottom:5px">${loc.region}</div>` : ''}
+    <div class="pop-row"><span>확진자</span><span>${loc.confirmed.toLocaleString()}명</span></div>
+    <div class="pop-row"><span>사망자</span><span style="color:#e63946">${loc.deaths.toLocaleString()}명</span></div>
+    <div class="pop-row"><span>치명률</span><span style="color:#f4845f">${loc.cfr}%</span></div>
+    <div class="pop-row"><span>상태</span><span style="color:${loc.status==='active'?'#e63946':'#34d399'}">${loc.status==='active'?'활성':'종식'}</span></div>
+  `).addTo(mapEl);
+});
+
+/* ── Chart 공통 설정 ── */
+Chart.defaults.color = '#4a5568';
+Chart.defaults.borderColor = '#1c2230';
+Chart.defaults.font.family = "'DM Mono', monospace";
+Chart.defaults.font.size = 10;
+
+/* ── 최근 5년 차트 ── */
+const rLabels    = {{ recent_labels    | safe }};
+const rConfirmed = {{ recent_confirmed | safe }};
+const rDeaths    = {{ recent_deaths    | safe }};
+const allLabels    = {{ all_labels    | safe }};
+const allConfirmed = {{ all_confirmed | safe }};
+const allDeaths    = {{ all_deaths    | safe }};
+
+const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+const timelineChart = new Chart(timelineCtx, {
+  type: 'bar',
+  data: {
+    labels: rLabels,
+    datasets: [
+      { label: '확진자', data: rConfirmed, backgroundColor: 'rgba(244,132,95,0.55)', borderColor: '#f4845f', borderWidth: 1, borderRadius: 3 },
+      { label: '사망자', data: rDeaths,    backgroundColor: 'rgba(230,57,70,0.55)',  borderColor: '#e63946', borderWidth: 1, borderRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top', labels: { boxWidth: 9, padding: 14 } },
+               tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y}명` } } },
+    scales: { x: { grid: { color: '#1c2230' } }, y: { grid: { color: '#1c2230' }, beginAtZero: true,
+              ticks: { callback: v => v + '명' } } }
+  }
+});
+
+/* ── 전체 이력 차트 ── */
+let allChartInited = false;
+
+function toggleHistory() {
+  const sec = document.getElementById('historySection');
+  const btn = document.getElementById('histBtn');
+  const shown = sec.style.display !== 'none';
+  sec.style.display = shown ? 'none' : 'block';
+  btn.classList.toggle('active', !shown);
+  btn.textContent = shown ? '전체 이력 보기' : '접기';
+
+  if (!shown && !allChartInited) {
+    allChartInited = true;
+    new Chart(document.getElementById('allTimelineChart'), {
+      type: 'bar',
+      data: {
+        labels: allLabels,
+        datasets: [
+          { label: '확진자', data: allConfirmed, backgroundColor: 'rgba(244,132,95,0.5)', borderColor: '#f4845f', borderWidth: 1, borderRadius: 2 },
+          { label: '사망자', data: allDeaths,    backgroundColor: 'rgba(230,57,70,0.5)',  borderColor: '#e63946', borderWidth: 1, borderRadius: 2 },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 9, padding: 14 } } },
+        scales: { x: { grid: { color: '#1c2230' } }, y: { grid: { color: '#1c2230' }, beginAtZero: true } }
+      }
+    });
+  }
+}
+
+/* ── CFR 차트 ── */
+const cLabels = {{ cfr_labels | safe }};
+const cValues = {{ cfr_values | safe }};
+new Chart(document.getElementById('cfrChart'), {
+  type: 'bar',
+  data: {
+    labels: cLabels,
+    datasets: [{
+      label: 'CFR (%)',
+      data: cValues,
+      backgroundColor: cValues.map(v => v >= 70 ? 'rgba(230,57,70,0.65)' : v >= 45 ? 'rgba(244,132,95,0.65)' : 'rgba(52,211,153,0.65)'),
+      borderColor:     cValues.map(v => v >= 70 ? '#e63946' : v >= 45 ? '#f4845f' : '#34d399'),
+      borderWidth: 1, borderRadius: 4,
+    }]
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false },
+               tooltip: { callbacks: { label: c => ` 치명률: ${c.parsed.x}%` } } },
+    scales: {
+      x: { grid: { color: '#1c2230' }, beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } },
+      y: { grid: { display: false } }
+    }
+  }
+});
+
+/* ── 갱신 ── */
+async function doRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  btn.classList.add('loading');
+  icon.className = 'spin'; icon.textContent = '↻';
+  try {
+    const res = await fetch('/api/refresh');
+    const j = await res.json();
+    if (j.status === 'ok') {
+      document.getElementById('ts').textContent = fmtNow();
+      setTimeout(() => location.reload(), 800);
+    }
+  } catch(e) { alert('갱신 실패: 서버를 확인하세요'); }
+  btn.classList.remove('loading');
+  icon.className = ''; icon.textContent = '↻';
+}
+
+/* ── 뉴스 날짜 오래된 항목 dimming ── */
+(function() {
+  const now = new Date();
+  document.querySelectorAll('.news-item').forEach(item => {
+    const meta = item.querySelector('.news-meta');
+    if (!meta) return;
+    const dateStr = meta.getAttribute('data-date');
+    if (!dateStr) return;
+    const pub = new Date(dateStr);
+    const diffDays = Math.floor((now - pub) / 86400000);
+    if (diffDays > 30) {
+      item.style.opacity = '0.45';
+      meta.insertAdjacentHTML('beforeend',
+        ` <span style="color:var(--muted);font-size:0.55rem;">(${diffDays}일 전)</span>`);
+    } else if (diffDays <= 3) {
+      item.style.borderColor = 'rgba(52,211,153,0.25)';
+      meta.insertAdjacentHTML('beforeend',
+        ` <span style="color:var(--green);font-size:0.55rem;">NEW</span>`);
+    }
+  });
+})();
+
+/* ── 30분마다 자동 갱신 ── */
+setInterval(() => {
+  fetch('/api/refresh').then(() => location.reload());
+}, 30 * 60 * 1000);
+
+</script>
+</body>
+</html>

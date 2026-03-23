@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+jinja2
+sqlalchemy
+requests
+beautifulsoup4
+lxml
+feedparser
+pandas
+geopy
+gunicorn
+psycopg2-binary
+apscheduler
