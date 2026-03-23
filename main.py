@@ -102,8 +102,11 @@ async def home(request: Request, db: Session = Depends(get_db)):
     )
 
     recent_events = sorted(
-        [r for r in timeline_raw if r.year >= current_year - 3],
-        key=lambda x: (x.year, x.confirmed), reverse=True
+        [{"year": r.year, "country": r.country,
+          "confirmed": r.confirmed, "deaths": r.deaths,
+          "source_note": r.source_note or ""}
+         for r in timeline_raw if r.year >= current_year - 3],
+        key=lambda x: (x["year"], x["confirmed"]), reverse=True
     )[:8]
 
     last_updated = db.query(NipahData).order_by(NipahData.last_updated.desc()).first()

@@ -123,14 +123,14 @@
             {% else %}dot-contained{% endif %}">
           </span>
           <div style="flex:1;">
-            <div class="event-country">{{ ev.country }}</div>
+            <div class="event-country">{{ ev['country'] }}</div>
             <div class="event-nums">
-              확진 <span>{{ ev.confirmed }}명</span> &nbsp;·&nbsp;
-              사망 <span class="red">{{ ev.deaths }}명</span>
-              <span style="margin-left:6px; font-size:0.6rem; color:var(--muted)">{{ ev.source_note[:30] if ev.source_note else '' }}</span>
+              확진 <span>{{ ev['confirmed'] }}명</span> &nbsp;·&nbsp;
+              사망 <span class="red">{{ ev['deaths'] }}명</span>
+              <span style="margin-left:6px; font-size:0.6rem; color:var(--muted)">{{ ev['source_note'][:30] if ev['source_note'] else '' }}</span>
             </div>
           </div>
-          <span class="event-year">{{ ev.year }}</span>
+          <span class="event-year">{{ ev['year'] }}</span>
         </div>
         {% endfor %}
       </div>
