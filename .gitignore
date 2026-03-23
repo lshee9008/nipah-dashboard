@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.idea/
+nipah.db
+*.db
+.env
+.DS_Store
