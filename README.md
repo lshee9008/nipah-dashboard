@@ -4,7 +4,7 @@
 
 **니파 바이러스 실시간 현황 대시보드**
 
-[![github](https://img.shields.io/badge/Live%20Demo-lshee9008-white?style=for-the-badge&logo=github)](https://nipah-tracker.onrender.com)
+[![github](https://img.shields.io/badge/github-lshee9008-white?style=for-the-badge&logo=github)](https://nipah-tracker.onrender.com)
   
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-nipah--tracker.onrender.com-red?style=for-the-badge&logo=render)](https://nipah-tracker.onrender.com)
   
