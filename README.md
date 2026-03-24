@@ -3,10 +3,14 @@
 # Nipah Tracker
 
 **니파 바이러스 실시간 현황 대시보드**
-
+[![github](https://img.shields.io/badge/Live%20Demo-lshee9008-white?style=for-the-badge&logo=github)](https://nipah-tracker.onrender.com)
+  
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-nipah--tracker.onrender.com-red?style=for-the-badge&logo=render)](https://nipah-tracker.onrender.com)
+  
 [![Python](https://img.shields.io/badge/Python-3.11-blue?style=for-the-badge&logo=python)](https://python.org)
+  
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+  
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)](LICENSE)
 
 WHO·IEDCR 공식 데이터 기반 · 자동 갱신 · 실시간 뉴스 수집
@@ -144,10 +148,11 @@ Render Blueprint 기반 원클릭 배포:
 git push origin main  # → Render 자동 재배포
 ```
 
-환경변수:
-| 변수 | 설명 |
-|---|---|
-| `DATABASE_URL` | PostgreSQL URL (없으면 SQLite) |
+### 환경변수
+
+| 변수          | 설명                              |
+|---------------|-----------------------------------|
+| DATABASE_URL  | PostgreSQL URL (없으면 SQLite)    |
 
 ---
 
