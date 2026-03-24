@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔴 Nipah Tracker
+# Nipah Tracker
 
 **니파 바이러스 실시간 현황 대시보드**
 
