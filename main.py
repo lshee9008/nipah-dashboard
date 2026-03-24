@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from database import SessionLocal, create_tables, NipahData, NipahNews, OutbreakTimeline
 import scraper
@@ -10,6 +11,7 @@ from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 import json
 import logging
+from jinja2 import Environment, FileSystemLoader
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,7 +41,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+
+# Jinja2 직접 초기화
+jinja_env = Environment(loader=FileSystemLoader("templates"))
+
+def render(template_name: str, context: dict) -> HTMLResponse:
+    template = jinja_env.get_template(template_name)
+    html = template.render(**context)
+    return HTMLResponse(content=html)
 
 def row_to_dict(row):
     return {c.name: getattr(row, c.name) for c in row.__table__.columns}
@@ -74,10 +83,10 @@ async def home(request: Request, db: Session = Depends(get_db)):
         all_by_year[y]["deaths"]    += row.deaths
 
     recent_confirmed = [all_by_year.get(y, {}).get("confirmed", 0) for y in recent_years]
-    recent_deaths    = [all_by_year.get(y, {}).get("deaths", 0)    for y in recent_years]
+    recent_deaths    = [all_by_year.get(y, {}).get("deaths", 0) for y in recent_years]
     all_labels    = sorted(all_by_year.keys())
     all_confirmed = [all_by_year[y]["confirmed"] for y in all_labels]
-    all_deaths    = [all_by_year[y]["deaths"]    for y in all_labels]
+    all_deaths    = [all_by_year[y]["deaths"] for y in all_labels]
 
     cfr_data = sorted(
         [{"country": d["country"], "cfr": d["fatality_rate"]} for d in stats if d["confirmed"] > 0],
@@ -94,7 +103,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
     last_raw = db.query(NipahData).order_by(NipahData.last_updated.desc()).first()
     last_updated_str = last_raw.last_updated.strftime("%Y-%m-%d %H:%M UTC") if last_raw else "—"
 
-    return templates.TemplateResponse("index.html", {
+    return render("index.html", {
         "request":          request,
         "stats":            stats,
         "total_confirmed":  total_confirmed,
@@ -109,7 +118,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         "all_confirmed":    json.dumps(all_confirmed),
         "all_deaths":       json.dumps(all_deaths),
         "cfr_labels":       json.dumps([d["country"] for d in cfr_data]),
-        "cfr_values":       json.dumps([d["cfr"]     for d in cfr_data]),
+        "cfr_values":       json.dumps([d["cfr"] for d in cfr_data]),
         "recent_events":    recent_events,
         "last_updated_str": last_updated_str,
         "current_year":     current_year,
@@ -126,8 +135,7 @@ async def refresh():
 
 @app.get("/api/stats")
 async def api_stats(db: Session = Depends(get_db)):
-    stats = db.query(NipahData).all()
-    return [row_to_dict(d) for d in stats]
+    return [row_to_dict(d) for d in db.query(NipahData).all()]
 
 if __name__ == "__main__":
     import uvicorn
