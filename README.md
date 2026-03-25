@@ -4,7 +4,7 @@
 
 **니파 바이러스 실시간 현황 대시보드**
 
-[![github](https://img.shields.io/badge/github-lshee9008-white?style=for-the-badge&logo=github)]([https://nipah-tracker.onrender.com](https://github.com/lshee9008/nipah-dashboard?tab=readme-ov-file))
+[![github](https://img.shields.io/badge/github-lshee9008-white?style=for-the-badge&logo=github)](https://github.com/lshee9008/nipah-dashboard?tab=readme-ov-file)
   
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-nipah--tracker.onrender.com-red?style=for-the-badge&logo=render)](https://nipah-tracker.onrender.com)
   
